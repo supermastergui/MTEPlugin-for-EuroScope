@@ -45,6 +45,7 @@ const int TAG_ITEM_TYPE_GS_TRND = 26; // GS (trend)
 const int TAG_ITEM_TYPE_SQ_EMRG = 27; // Emergency flag
 const int TAG_ITEM_TYPE_CLAM_FLAG = 28; // CLAM flag
 const int TAG_ITEM_TYPE_RAM_FLAG = 29; // RAM flag
+const int TAG_ITEM_TYPE_DEP_SORT = 30; // DEP SORTED  //self
 #endif // !TAG_TYPE
 
 #ifndef TAG_FUNCTION // TAG ITEM FUNCTION
@@ -198,6 +199,7 @@ private:
 	std::unique_ptr<DepartureSequence> m_DepartureSequence;
 	std::unique_ptr<TrackRecorder> m_TrackRecorder;
 	std::unique_ptr<TransitionLevel> m_TransitionLevel;
+	std::map<std::string, float> ground_sts;  //self
 	bool m_CustomCursor = false; // status, doesn't reflect setting
 
 	template<typename T>
@@ -216,4 +218,5 @@ private:
 	void LoadTransitionLevel(void);
 	void LoadMetricAltitude(void);
 	std::string DisplayRouteMessage(const std::string& departure, const std::string& arrival);
+	std::map<std::string, int> classifyAndSort();  //self
 };

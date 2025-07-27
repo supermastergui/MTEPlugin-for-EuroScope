@@ -139,10 +139,15 @@ std::vector<AltitudeMenuEntry> MetricAlt::GetMenuItems(const bool& metric, const
 
 int MetricAlt::GetAltitudeFromMenuItem(const std::string& menuItem, const bool& metric)
 {
+	//È¥³ý¡°*¡±ÄÚÈÝ
+	std::string Subitem = menuItem;
+	if (menuItem.back() == '*') {
+		Subitem.pop_back();
+	}
 	for (auto& as : m_AltStrMap) {
 		std::string s = metric ? as.m : as.f;
 		std::string sa = metric ? as.ma : as.fa;
-		if (menuItem == s || menuItem == sa)
+		if (Subitem == s || Subitem == sa)
 			return as.alt;
 	}
 	return ALT_MAP_NOT_FOUND;
@@ -165,3 +170,14 @@ std::string MetricAlt::GetPreservedCflItem(const int& preservedCfl, const bool& 
 	}
 	return "";
 }
+//self
+std::string MetricAlt::GetAltSuffix(const int& rfl, const int& menu_alt)
+{
+	if (LvlFeetEvenOdd(rfl) == LvlFeetEvenOdd(menu_alt)) {
+		return "*";
+	}
+	else {
+		return "";
+	}
+}
+//self

@@ -7,12 +7,16 @@ RX_TIME = r"#define BUILD_TIME (.+)"
 originlines = open("Version.h", 'r').readlines()
 newlines = []
 for l in originlines:
-    if (mb := re.match(RX_BUILD, l)) is not None:
-        bn = int(mb[1])+1
-        newlines.append(f"#define VERSION_BUILD {bn}\n")
-    elif (mt := re.match(RX_TIME, l)) is not None:
-        tm = time.strftime(r"%y%m%d%H%M", time.gmtime())
-        newlines.append(f"#define BUILD_TIME {tm}\n")
+    mb = re.match(RX_BUILD, l)
+    if mb is not None:
+        bn = int(mb.group(1)) + 1
+        newlines.append('#define VERSION_BUILD {}\n'.format(bn))
     else:
-        newlines.append(l)
-open("Version.h", 'w', newline='\r\n').writelines(newlines)
+        mt = re.match(RX_TIME, l)
+        if mt is not None:
+            tm = time.strftime(r"%y%m%d%H%M", time.gmtime())
+            newlines.append("#define BUILD_TIME {}\n".format(tm))
+        else:
+            newlines.append(l)
+
+open("Version.h", 'w').writelines(newlines)

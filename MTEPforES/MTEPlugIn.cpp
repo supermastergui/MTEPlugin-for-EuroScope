@@ -74,6 +74,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Emergency flag", TAG_ITEM_TYPE_SQ_EMRG);
 	RegisterTagItemType("CLAM flag", TAG_ITEM_TYPE_CLAM_FLAG);
 	RegisterTagItemType("RAM flag", TAG_ITEM_TYPE_RAM_FLAG);
+	RegisterTagItemType("Departure sorted", TAG_ITEM_TYPE_DEP_SORT);
 
 	RegisterTagItemFunction("Set coordination flag", TAG_ITEM_FUNCTION_SET_CFLAG);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
@@ -255,7 +256,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 				PrintStr(MetricAlt::GetPreservedCflItem(0, !isfeet));
 			}
 			else {
-				PrintStr("");
+				PrintStr("    ");
 			}
 		}
 		else { // have a cleared level
@@ -469,6 +470,37 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		break;
 	}
+	//self
+	case TAG_ITEM_TYPE_DEP_SORT: {
+		if (!FlightPlan.IsValid()) break;
+		std::string callsign = FlightPlan.GetCallsign();
+		std::map<std::string, int> sts_level = {
+			{"STUP" , 2},
+			{"PUSH" , 3},
+			{"TAXI" , 4},
+			{"DEPA" , 5}
+		};
+		std::string sts = FlightPlan.GetGroundState();
+		if (!m_DepartureSequence) m_DepartureSequence = std::make_unique<DepartureSequence>();
+		float seq = m_DepartureSequence->GetSequence(FlightPlan);
+		if (sts != "") {
+			ground_sts[callsign] = sts_level[sts];
+		}
+		else if (!FlightPlan.GetClearenceFlag() && seq > 0) {
+			ground_sts[callsign] = seq / 100;
+		}
+		else if (!FlightPlan.GetClearenceFlag()) {
+			ground_sts[callsign] = 0.99;
+		}
+		else if (FlightPlan.GetClearenceFlag()) {
+			ground_sts[callsign] = 1;
+		}
+
+		std::map<std::string, int> rankedMap = classifyAndSort();
+		PrintStr(std::format("{:02d}", OVRFLW2(rankedMap[callsign])));
+		break;
+	}
+	//self
 	case TAG_ITEM_TYPE_DEP_STS: {
 		if (!FlightPlan.IsValid()) break;
 		std::string gsts = FlightPlan.GetGroundState();
@@ -616,7 +648,10 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	}
 	case TAG_ITEM_FUNCTION_CFL_SET_MENU: {
 		if (!FlightPlan.IsValid()) break;
+
+		//DisplayUserMessage("MTEP-Recorder", "MTEPlugin", sItemString, 1, 1, 0, 0, 0);
 		int tgtAlt = MetricAlt::GetAltitudeFromMenuItem(sItemString, !m_TrackRecorder->IsForceFeet(FlightPlan));
+
 		if (tgtAlt > MetricAlt::ALT_MAP_NOT_FOUND) {
 			if (tgtAlt == 1 || tgtAlt == 2) { // ILS or VA
 				FlightPlan.GetControllerAssignedData().SetAssignedHeading(0);
@@ -728,7 +763,17 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		int minAlt = std::ranges::min_element(m_alt, {}, [&](const auto& a) { return abs(a.altitude - cmpAlt); })->altitude;
 		for (auto it = m_alt.rbegin(); it != m_alt.rend(); it++) {
 			if (it->altitude > 3) { // not NONE, ILS, VA, EDIT
-				AddPopupListElement(it->entry.c_str(), nullptr, TAG_ITEM_FUNCTION_CFL_SET_MENU, it->altitude == minAlt, POPUP_ELEMENT_NO_CHECKBOX, false, false);
+				//self
+				if (it->altitude > 19700){
+					std::string suffix = MetricAlt::GetAltSuffix(FlightPlan.GetFinalAltitude(), it->altitude);
+					it->entry = it->entry + suffix;
+					AddPopupListElement(it->entry.c_str(), nullptr, TAG_ITEM_FUNCTION_CFL_SET_MENU, it->altitude == minAlt, POPUP_ELEMENT_NO_CHECKBOX, false, false);
+					//DisplayUserMessage("MTEP-Recorder", "MTEPlugin", std::to_string(it->altitude).c_str(), 1, 1, 0, 0, 0);
+				}
+				else {
+					AddPopupListElement(it->entry.c_str(), nullptr, TAG_ITEM_FUNCTION_CFL_SET_MENU, it->altitude == minAlt, POPUP_ELEMENT_NO_CHECKBOX, false, false);
+				}
+				//self
 			}
 			else if (it->altitude == 3) { // EDIT
 				AddPopupListElement(it->entry.c_str(), nullptr, TAG_ITEM_FUNCTION_CFL_EDIT, false, POPUP_ELEMENT_NO_CHECKBOX, false, true);
@@ -1566,6 +1611,38 @@ inline std::string GetRealFileName(const std::string& path)
 	}
 	return pFilename.string();
 }
+
+//self
+std::map<std::string, int> CMTEPlugIn::classifyAndSort() {
+	// Temporary vector to store (id, status) pairs
+	std::vector<std::pair<std::string, float>> sortedList;
+
+	// Step 1: Populate the vector with the map's content
+	for (const auto& entry : ground_sts) {
+		sortedList.emplace_back(entry.first, entry.second);
+	}
+
+	// Step 2: Sort the vector first by status (descending), then by id (alphabetical)
+	std::sort(sortedList.begin(), sortedList.end(), [](const auto& a, const auto& b) {
+		if ((int)a.second != (int)b.second) {
+			return a.second > b.second; // Sort by status descending
+		}
+		else if (a.second != b.second) {
+			return a.second < b.second;
+		}
+		return a.first < b.first;      // Sort by id ascending if status is the same
+		});
+
+	// Step 3: Create a new map and assign ranks
+	std::map<std::string, int> rankedMap;
+	int rank = 1;
+	for (const auto& entry : sortedList) {
+		rankedMap[entry.first] = rank++;
+	}
+
+	return rankedMap;
+}
+//self
 
 BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam)
 {

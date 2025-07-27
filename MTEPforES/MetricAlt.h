@@ -228,4 +228,5 @@ namespace MetricAlt {
 	std::vector<AltitudeMenuEntry> GetMenuItems(const bool& metric, const int& trans_level);
 	int GetAltitudeFromMenuItem(const std::string& menuItem, const bool& metric);
 	std::string GetPreservedCflItem(const int& preservedCfl, const bool& metric);
+	std::string GetAltSuffix(const int& rfl, const int& menu_alt);
 }
